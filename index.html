@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Аниме">
+<title>Аниме</title>
+<style>
+:root{--bg:#eef0f7;--card:#fff;--ink:#23243a;--mute:#6b6d86;--line:#d9dcea;--accent:#d63a74;--accent-ink:#fff;color-scheme:light;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171829;--card:#222440;--ink:#eceefc;--mute:#9a9cbb;--line:#33355a;--accent:#ff6b9c;--accent-ink:#2a0d19;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171829;--card:#222440;--ink:#eceefc;--mute:#9a9cbb;--line:#33355a;--accent:#ff6b9c;--accent-ink:#2a0d19;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:680px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:30px;margin:0 0 14px;letter-spacing:-.02em}
+input{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 12px;margin-bottom:12px}
+input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px}
+.tabs button{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:8px 14px;font:inherit;font-size:14px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.item{display:grid;grid-template-columns:96px 1fr;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+.cover{width:96px;height:136px;border-radius:8px;object-fit:cover;background:var(--line)}
+.t{font-weight:600;margin:0 0 2px;overflow-wrap:anywhere}
+.m{color:var(--mute);font-size:14px;margin:0 0 6px}
+.ep{font-size:14px;margin:0 0 2px}
+.next{font-size:14px;color:var(--accent);margin:0 0 8px;font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
+.chips a{border:1px solid var(--line);border-radius:8px;padding:4px 9px;font-size:13px;color:var(--ink);text-decoration:none}
+.chips .none{color:var(--mute);font-size:13px}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.row button{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:8px;padding:6px 10px;font:inherit;font-size:14px;cursor:pointer}
+.row .main{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.imp{margin-bottom:12px}.imp button{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;cursor:pointer}#impMsg{margin:6px 0 0;color:var(--mute);font-size:14px}
+.msg{text-align:center;color:var(--mute);padding:30px 12px;border:1px dashed var(--line);border-radius:14px}
+.more[hidden]{display:none}
+.more{display:block;width:100%;margin-top:4px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+<main>
+<h1>Аниме</h1>
+<input id="q" type="search" placeholder="Название по-русски или по-английски" autocomplete="off">
+<div class="imp"><button type="button" id="impBtn">Импорт списка из Anixart (CSV)</button><input type="file" id="file" accept=".csv,.txt,text/*" hidden><p id="impMsg"></p></div>
+<div class="tabs" id="tabs"></div>
+<div id="list"></div>
+<button class="more" id="more" hidden>Показать ещё</button>
+</main>
+<script>
+var API="https://graphql.anilist.co";
+var F="id idMal title{romaji english} coverImage{large color} episodes status format averageScore nextAiringEpisode{episode airingAt} externalLinks{site url type} siteUrl";
+var TABS={airing:"Сейчас выходит",soon:"Скоро",mine:"Мой список"};
+var STAT={RELEASING:"Выходит",FINISHED:"Завершено",NOT_YET_RELEASED:"Анонс",CANCELLED:"Отменено",HIATUS:"Пауза"};
+var KEY="anime:mine",mine={},mode="airing",query="",page=1,items=[],hasMore=false,timer,token=0;
+function load(){try{mine=JSON.parse(localStorage.getItem(KEY)||"{}")||{}}catch(e){mine={}}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(mine))}catch(e){}}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function safeUrl(u){return/^https:\/\//.test(u||"")?u:"#"}
+function gql(q,v){return fetch(API,{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({query:q,variables:v})}).then(function(r){return r.json()}).then(function(j){if(j.errors)throw new Error(j.errors[0].message);return j.data.Page})}
+var ru={};
+function isRu(s){return/[а-яё]/i.test(s)}
+function shiki(q,p){return fetch("https://shikimori.one/api/animes?search="+encodeURIComponent(q)+"&limit=20&page="+p+"&order=popularity").then(function(r){if(!r.ok)throw new Error("shiki");return r.json()})}
+function requestRu(){
+ return shiki(query,page).then(function(list){
+  list.forEach(function(a){if(a.russian)ru[a.id]=a.russian});
+  var ids=list.map(function(a){return Number(a.id)});
+  if(!ids.length)return{pageInfo:{hasNextPage:false},media:[]};
+  return gql("query($ids:[Int]){Page(perPage:50){media(idMal_in:$ids,type:ANIME,isAdult:false){"+F+"}}}",{ids:ids}).then(function(p){
+   p.media.sort(function(a,b){return ids.indexOf(a.idMal)-ids.indexOf(b.idMal)});
+   p.pageInfo={hasNextPage:list.length>=20};return p})
+ })
+}
+function request(){
+ if(query&&isRu(query))return requestRu();
+ if(query)return gql("query($p:Int,$s:String){Page(page:$p,perPage:20){pageInfo{hasNextPage}media(type:ANIME,search:$s,sort:SEARCH_MATCH,isAdult:false){"+F+"}}}",{p:page,s:query});
+ if(mode==="mine"){var all=Object.keys(mine).map(Number),ids=all.slice((page-1)*50,page*50);if(!ids.length)return Promise.resolve({pageInfo:{hasNextPage:false},media:[]});return gql("query($ids:[Int]){Page(perPage:50){media(id_in:$ids,type:ANIME){"+F+"}}}",{ids:ids}).then(function(p){p.pageInfo={hasNextPage:all.length>page*50};return p})}
+ var st=mode==="soon"?"NOT_YET_RELEASED":"RELEASING";
+ return gql("query($p:Int){Page(page:$p,perPage:20){pageInfo{hasNextPage}media(type:ANIME,status:"+st+",sort:POPULARITY_DESC,isAdult:false){"+F+"}}}",{p:page})
+}
+function aired(x){if(x.nextAiringEpisode)return x.nextAiringEpisode.episode-1;if(x.status==="FINISHED")return x.episodes||0;return 0}
+function fmtDate(ts){return new Date(ts*1000).toLocaleDateString("ru-RU",{day:"numeric",month:"long",hour:"2-digit",minute:"2-digit"})}
+function card(x){
+ var orig=x.title.english||x.title.romaji,name=ru[x.idMal]||orig,a=aired(x),id=String(x.id),saved=id in mine;
+ var links=(x.externalLinks||[]).filter(function(l){return l.type==="STREAMING"});
+ var seen=mine[id]||0;
+ var epLine=x.status==="NOT_YET_RELEASED"?"Серии ещё не выходили"+(x.episodes?", запланировано "+x.episodes:""):"Вышло серий: "+a+(x.episodes?" из "+x.episodes:" (всего пока неизвестно)");
+ var h='<div class="item" data-id="'+id+'"><img class="cover" loading="lazy" alt="" src="'+esc(safeUrl(x.coverImage&&x.coverImage.large))+'"><div>';
+ h+='<p class="t">'+esc(name)+'</p><p class="m">'+(name!==orig?esc(orig)+"<br>":"")+esc(STAT[x.status]||x.status)+(x.format?", "+esc(x.format):"")+(x.averageScore?", оценка "+x.averageScore+"/100":"")+'</p>';
+ h+='<p class="ep">'+epLine+'</p>';
+ if(x.nextAiringEpisode)h+='<p class="next">Серия '+x.nextAiringEpisode.episode+" выйдет "+esc(fmtDate(x.nextAiringEpisode.airingAt))+"</p>";
+ if(saved)h+='<p class="ep">Просмотрено: '+seen+(a>seen?", новых: "+(a-seen):"")+"</p>";
+ h+='<div class="chips">'+(links.length?links.map(function(l){return'<a href="'+esc(safeUrl(l.url))+'" target="_blank" rel="noopener noreferrer">'+esc(l.site)+"</a>"}).join(""):'<span class="none">Легальных ссылок в базе пока нет</span>')+'<a href="'+esc(safeUrl(x.siteUrl))+'" target="_blank" rel="noopener noreferrer">AniList</a></div>';
+ h+='<div class="row"><button class="main" data-a="toggle" type="button">'+(saved?"Убрать из списка":"В мой список")+"</button>";
+ if(saved)h+='<button data-a="plus" type="button">+1 серия</button><button data-a="minus" type="button">−1</button>';
+ return h+"</div></div></div>"
+}
+function render(msg){
+ document.getElementById("tabs").innerHTML=Object.keys(TABS).map(function(k){return'<button type="button" data-tab="'+k+'" aria-pressed="'+(!query&&k===mode)+'">'+TABS[k]+"</button>"}).join("");
+ var el=document.getElementById("list");
+ if(msg)el.innerHTML='<div class="msg">'+msg+"</div>";
+ else if(!items.length)el.innerHTML='<div class="msg">'+(mode==="mine"&&!query?"Список пуст. Найдите аниме и нажмите «В мой список».":"Ничего не найдено.")+"</div>";
+ else el.innerHTML=items.map(card).join("");
+ document.getElementById("more").hidden=!hasMore||!!msg
+}
+function fetchPage(append){
+ var my=++token;
+ if(!append)render("Загружаем…");
+ request().then(function(p){
+  if(my!==token)return;
+  items=append?items.concat(p.media):p.media;hasMore=!!(p.pageInfo&&p.pageInfo.hasNextPage);render()
+ }).catch(function(){if(my===token)render(query&&isRu(query)?"Русский поиск сейчас недоступен. Попробуйте ввести название по-английски или ромадзи.":"Не удалось загрузить данные. Проверьте интернет и попробуйте ещё раз.")})
+}
+function reset(){page=1;items=[];fetchPage(false)}
+document.getElementById("q").oninput=function(e){clearTimeout(timer);var v=e.target.value.trim();timer=setTimeout(function(){query=v;reset()},400)};
+document.getElementById("tabs").onclick=function(e){var b=e.target.closest("button");if(!b)return;mode=b.dataset.tab;query="";document.getElementById("q").value="";reset()};
+document.getElementById("more").onclick=function(){page++;fetchPage(true)};
+document.getElementById("list").onclick=function(e){
+ var b=e.target.closest("button"),it=e.target.closest(".item");if(!b||!it)return;
+ var id=it.dataset.id,x=items.filter(function(i){return String(i.id)===id})[0];if(!x)return;
+ if(b.dataset.a==="toggle"){if(id in mine)delete mine[id];else mine[id]=0}
+ else if(b.dataset.a==="plus")mine[id]=(mine[id]||0)+1;
+ else if(b.dataset.a==="minus")mine[id]=Math.max(0,(mine[id]||0)-1);
+ save();
+ if(mode==="mine"&&!query&&!(id in mine)){items=items.filter(function(i){return String(i.id)!==id})}
+ render()
+};
+
+function parseCSV(t){var rows=[],row=[],f="",q=false;t=t.replace(/^\uFEFF/,"");for(var i=0;i<t.length;i++){var c=t[i];if(q){if(c==='"'){if(t[i+1]==='"'){f+='"';i++}else q=false}else f+=c}else if(c==='"')q=true;else if(c===","){row.push(f);f=""}else if(c==="\n"||c==="\r"){if(c==="\r"&&t[i+1]==="\n")i++;row.push(f);rows.push(row);row=[];f=""}else f+=c}if(f||row.length){row.push(f);rows.push(row)}return rows}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
+async function post(query,vars,msg){
+ var err="нет ответа";
+ for(var t=0;t<5;t++){
+  try{
+   var r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},body:JSON.stringify({query:query,variables:vars})});
+   if(r.status===429){var w=parseInt(r.headers.get("Retry-After"),10)||60;msg.textContent="Лимит запросов AniList, ждём "+w+" с…";await sleep(w*1000);err="лимит запросов";continue}
+   var j=await r.json();
+   if(j.data)return{data:j.data};
+   err=(j.errors&&j.errors[0]&&j.errors[0].message)||("ошибка "+r.status);
+   await sleep(3000)
+  }catch(e){err="сеть: "+(e&&e.message||e);await sleep(3000)}
+ }
+ return{err:err}
+}
+function mkQuery(chunk){var vars={},decl=[],body=[];chunk.forEach(function(t,i){vars["s"+i]=t.q;decl.push("$s"+i+":String");body.push("m"+i+":Media(search:$s"+i+",type:ANIME,isAdult:false,sort:SEARCH_MATCH){id}")});return{query:"query("+decl.join(",")+"){"+body.join(" ")+"}",vars:vars}}
+async function importList(list){
+ var msg=document.getElementById("impMsg"),added=0,miss=[],failed=[],retry=[],reason="",B=5;
+ function take(t,m){if(m&&m.id){if(!(String(m.id) in mine))mine[String(m.id)]=0;added++}else miss.push(t.ru||t.q)}
+ for(var s=0;s<list.length;s+=B){
+  var chunk=list.slice(s,s+B),q=mkQuery(chunk);
+  msg.textContent="Импорт: "+Math.min(s+B,list.length)+" из "+list.length+"…";
+  var res=await post(q.query,q.vars,msg);
+  if(res.data)chunk.forEach(function(t,i){take(t,res.data["m"+i])});
+  else{reason=res.err;retry=retry.concat(chunk)}
+  await sleep(3000)
+ }
+ for(var k=0;k<retry.length;k++){
+  msg.textContent="Повтор для пропущенных: "+(k+1)+" из "+retry.length+"…";
+  var q1=mkQuery([retry[k]]),r1=await post(q1.query,q1.vars,msg);
+  if(r1.data)take(retry[k],r1.data.m0);else{failed.push(retry[k].ru||retry[k].q);reason=r1.err}
+  await sleep(3000)
+ }
+ save();
+ msg.textContent="Добавлено "+added+" из "+list.length+"."+(miss.length?" Нет в базе AniList ("+miss.length+"): "+miss.slice(0,10).join("; ")+(miss.length>10?" и другие":"")+".":"")+(failed.length?" Не удалось проверить ("+failed.length+"), причина: "+reason+". Запустите импорт ещё раз.":"");
+ mode="mine";query="";document.getElementById("q").value="";reset()
+}
+document.getElementById("impBtn").onclick=function(){document.getElementById("file").click()};
+document.getElementById("file").onchange=function(e){
+ var f=e.target.files[0];if(!f)return;
+ f.text().then(function(t){
+  var rows=parseCSV(t).slice(1),list=[];
+  rows.forEach(function(r){if(r.length<3)return;var orig=(r[2]||"").trim(),ru=(r[1]||"").trim();if(orig||ru)list.push({q:orig||ru,ru:ru})});
+  e.target.value="";
+  if(!list.length){document.getElementById("impMsg").textContent="В файле не нашлось названий.";return}
+  importList(list)
+ })
+};
+load();reset();
+</script>
+</body>
+</html>
