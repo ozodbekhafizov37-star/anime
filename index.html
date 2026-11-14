@@ -87,6 +87,51 @@ input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--accent)
 .stat:last-child:nth-child(odd){grid-column:1/-1;border-right:0}
 .stat .num{display:block;font-size:40px;font-weight:600;letter-spacing:-.03em;line-height:1}
 .stat .lab2{display:block;margin-top:8px;font:500 11px "IBM Plex Mono",monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+
+:root{--glow:rgba(255,255,255,.55)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--glow:rgba(127,176,214,.28)}}
+:root[data-theme="dark"]{--glow:rgba(127,176,214,.28)}
+html{scroll-behavior:smooth}
+@keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes drift{0%{background-position:0% 0%}50%{background-position:100% 100%}100%{background-position:0% 0%}}
+@keyframes glow{0%,100%{opacity:.55;transform:translate(0,0) scale(1)}50%{opacity:1;transform:translate(-8%,6%) scale(1.18)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes shimmer{to{background-position:-200% 0}}
+.hero{position:relative;overflow:hidden;background-size:200% 200%;animation:drift 18s ease-in-out infinite}
+.hero::before{content:"";position:absolute;width:70vw;height:70vw;max-width:520px;max-height:520px;right:-12%;top:-25%;border-radius:50%;background:radial-gradient(circle,var(--glow),transparent 65%);animation:glow 9s ease-in-out infinite;pointer-events:none}
+.hero .in{position:relative}
+.hero .in>*{animation:rise .8s cubic-bezier(.2,.7,.2,1) both}
+.hero .in>:nth-child(2){animation-delay:.1s}
+.hero .in>:nth-child(3){animation-delay:.2s}
+.hero .in>:nth-child(4){animation-delay:.3s}
+.logo i{display:inline-block;animation:pulse 3.2s ease-in-out infinite}
+.rv{opacity:0;transform:translateY(22px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1)}
+.rv.in{opacity:1;transform:none}
+#list.anim>*{animation:rise .55s cubic-bezier(.2,.7,.2,1) both}
+#list.anim>:nth-child(2){animation-delay:.05s}
+#list.anim>:nth-child(3){animation-delay:.1s}
+#list.anim>:nth-child(4){animation-delay:.15s}
+#list.anim>:nth-child(5){animation-delay:.2s}
+#list.anim>:nth-child(6){animation-delay:.25s}
+#list.anim>:nth-child(7){animation-delay:.3s}
+#list.anim>:nth-child(8){animation-delay:.35s}
+#list.anim>:nth-child(9){animation-delay:.4s}
+#list.anim>:nth-child(10){animation-delay:.45s}
+img.cover{opacity:0;transition:opacity .6s ease,transform .5s cubic-bezier(.2,.7,.2,1)}
+.item:hover .cover{transform:scale(1.04)}
+.row button,.kinds button,.subs button,.tabs button,.imp button,.more,.stat{transition:background .2s,color .2s,border-color .25s,transform .15s}
+.row button:active,.kinds button:active,.subs button:active,.imp button:active,.more:active,.stat:active{transform:scale(.96)}
+.tabs b{transition:color .25s}
+.chips a{transition:background .2s,color .2s,border-color .2s}
+.chips a:hover{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.sk{display:grid;grid-template-columns:92px 1fr;gap:16px;padding:20px 0;border-top:1px solid var(--line)}
+.sk i{display:block;border-radius:2px;background:linear-gradient(90deg,var(--band) 25%,var(--line) 50%,var(--band) 75%);background-size:200% 100%;animation:shimmer 1.4s linear infinite}
+.sk .c{width:92px;height:130px}
+.sk .l{height:12px;margin:0 0 12px}
+.sk .l1{width:35%}
+.sk .l2{width:80%;height:20px}
+.sk .l3{width:60%}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}img.cover{opacity:1}}
 </style>
 </head>
 <body>
@@ -113,13 +158,13 @@ input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--accent)
 <button class="more" id="more" hidden>Показать ещё</button>
 </section>
 </main>
-<p class="ver">Версия 10</p>
+<p class="ver">Версия 11</p>
 <script>
 var API="https://graphql.anilist.co";
 var F="id idMal title{romaji english} coverImage{large color} episodes status format averageScore nextAiringEpisode{episode airingAt} externalLinks{site url type} siteUrl";
 var TABS={airing:"Сейчас выходит",soon:"Скоро",mine:"Мой список",profile:"Профиль"};
 var STATS={watch:"Смотрю",done:"Просмотрено",plan:"Буду смотреть",drop:"Брошено",wait:"Ожидает выхода"},sub="plan";
-var kind="anime",lib={film:{},series:{}},rt={},shikiBad=false;
+var kind="anime",lib={film:{},series:{}},rt={},shikiBad=false,animateNext=false;
 var KINDS={anime:"Аниме",film:"Фильмы",series:"Сериалы"},KW={anime:"аниме",film:"фильм",series:"сериал"};
 var FMT={TV:"ТВ",TV_SHORT:"ТВ-короткометражка",MOVIE:"Фильм",SPECIAL:"Спецвыпуск",OVA:"OVA",ONA:"ONA",MUSIC:"Клип"};
 var STAT={RELEASING:"Выходит",FINISHED:"Завершено",NOT_YET_RELEASED:"Анонс",CANCELLED:"Отменено",HIATUS:"Пауза"};
@@ -155,7 +200,7 @@ function card(x){
  var orig=x.title.english||x.title.romaji,name=rt[String(x.id)]||ru[x.idMal]||orig,a=aired(x),id=String(x.id),saved=id in mine;
  var links=(x.externalLinks||[]).filter(function(l){return l.type==="STREAMING"});
  var epLine=x.status==="NOT_YET_RELEASED"?"Серии ещё не выходили"+(x.episodes?", запланировано "+x.episodes:""):"Вышло серий: "+a+(x.episodes?" из "+x.episodes:" (всего пока неизвестно)");
- var h='<article class="item" data-id="'+id+'"><img class="cover" loading="lazy" alt="" src="'+esc(safeUrl(x.coverImage&&x.coverImage.large))+'"><div>';
+ var h='<article class="item" data-id="'+id+'"><img class="cover" loading="lazy" alt="" onload="this.style.opacity=1" src="'+esc(safeUrl(x.coverImage&&x.coverImage.large))+'"><div>';
  h+='<p class="lab">'+esc(STAT[x.status]||x.status)+(x.format?" / "+esc(FMT[x.format]||x.format):"")+(x.averageScore?" / "+x.averageScore+"%":"")+'</p>';
  h+='<h3 class="t">'+esc(name)+'</h3>'+(name!==orig?'<p class="orig">'+esc(orig)+'</p>':"");
  h+='<p class="ep">'+epLine+'</p>';
@@ -174,10 +219,11 @@ function render(msg){
  document.getElementById("q").placeholder="Название аниме, фильма или сериала";
  var imp=document.querySelector(".imp");if(imp)imp.style.display=kind==="anime"?"":"none";
  var el=document.getElementById("list"),pre=(mode==="mine"&&!query)?subsHtml():"";
- if(mode==="profile"&&!query){el.innerHTML=profileHtml();var nm=document.getElementById("nm");if(nm)nm.oninput=function(e){setName(e.target.value);var pn=document.getElementById("pn");if(pn)pn.textContent=e.target.value||"Мой профиль"};var tk=document.getElementById("tk");if(tk)tk.oninput=function(e){try{localStorage.setItem("anime:tmdb",e.target.value.trim())}catch(_){}};document.getElementById("more").hidden=true;return}
- if(msg)el.innerHTML=pre+'<div class="msg">'+msg+"</div>";
+ if(mode==="profile"&&!query){el.innerHTML=profileHtml();if(animateNext){animateNext=false;pulse(el)}var nm=document.getElementById("nm");if(nm)nm.oninput=function(e){setName(e.target.value);var pn=document.getElementById("pn");if(pn)pn.textContent=e.target.value||"Мой профиль"};var tk=document.getElementById("tk");if(tk)tk.oninput=function(e){try{localStorage.setItem("anime:tmdb",e.target.value.trim())}catch(_){}};var kk=document.getElementById("kk");if(kk)kk.oninput=function(e){try{localStorage.setItem("anime:kp",e.target.value.trim())}catch(_){}};document.getElementById("more").hidden=true;return}
+ if(msg)el.innerHTML=pre+((msg==="Загружаем…"||msg==="Ищем…")?skel():'<div class="msg">'+msg+"</div>");
  else if(!items.length)el.innerHTML=pre+'<div class="msg">'+(mode==="mine"&&!query?"В этом разделе пока пусто. Найдите "+KW[kind]+" и нажмите «В мой список».":"Ничего не найдено.")+"</div>";
  else el.innerHTML=pre+items.map(cardAny).join("");
+ if(animateNext&&!msg){animateNext=false;pulse(el)}
  document.getElementById("more").hidden=!hasMore||!!msg
 }
 function coll(){return kind==="anime"?mine:lib[kind]}
@@ -189,7 +235,7 @@ function getName(){try{return localStorage.getItem("anime:name")||""}catch(e){re
 function setName(v){try{localStorage.setItem("anime:name",v)}catch(e){}}
 function profileHtml(){
  var c=counts(),total=Object.keys(coll()).length,name=getName();
- return'<div class="prof"><p class="lab">Имя</p><input id="nm" value="'+esc(name)+'" maxlength="30" placeholder="Как вас называть" autocomplete="off"><h3 class="pname" id="pn">'+esc(name||"Мой профиль")+'</h3><p class="ep">Всего в списке: '+total+'</p><p class="orig">Аниме '+Object.keys(mine).length+", фильмы "+Object.keys(lib.film).length+", сериалы "+Object.keys(lib.series).length+'</p><div class="stats">'+Object.keys(STATS).map(function(k){return'<button type="button" class="stat" data-go="'+k+'"><span class="num">'+c[k]+'</span><span class="lab2">'+STATS[k]+"</span></button>"}).join("")+"</div>"+'<div class="key"><p class="lab">Ключ TMDB</p><input id="tk" value="'+esc(tkey())+'" placeholder="Вставьте ключ" autocomplete="off" autocapitalize="off" spellcheck="false"><p class="orig">Нужен для поиска фильмов и сериалов и для русских названий аниме. Бесплатно: <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">themoviedb.org → Настройки → API</a>. Ключ хранится только в этом браузере, после вставки обновите страницу.</p></div></div>'
+ return'<div class="prof"><p class="lab">Имя</p><input id="nm" value="'+esc(name)+'" maxlength="30" placeholder="Как вас называть" autocomplete="off"><h3 class="pname" id="pn">'+esc(name||"Мой профиль")+'</h3><p class="ep">Всего в списке: '+total+'</p><p class="orig">Аниме '+Object.keys(mine).length+", фильмы "+Object.keys(lib.film).length+", сериалы "+Object.keys(lib.series).length+'</p><div class="stats">'+Object.keys(STATS).map(function(k){return'<button type="button" class="stat" data-go="'+k+'"><span class="num">'+c[k]+'</span><span class="lab2">'+STATS[k]+"</span></button>"}).join("")+"</div>"+'<div class="key"><p class="lab">Ключ TMDB</p><input id="tk" value="'+esc(tkey())+'" placeholder="Вставьте ключ" autocomplete="off" autocapitalize="off" spellcheck="false"><p class="orig">Нужен для поиска фильмов и сериалов и для русских названий аниме. Бесплатно: <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener noreferrer">themoviedb.org → Настройки → API</a>. Ключ хранится только в этом браузере, после вставки обновите страницу.</p></div><div class="key"><p class="lab">Токен Кинопоиска (необязательно)</p><input id="kk" value="'+esc(kpkey())+'" placeholder="Вставьте токен" autocomplete="off" autocapitalize="off" spellcheck="false"><p class="orig">Добавляет в поиск отдельную группу «Кинопоиск» (русские названия, оценки, ссылки на страницы фильмов). Бесплатная регистрация и токен: <a href="https://kinopoiskapiunofficial.tech" target="_blank" rel="noopener noreferrer">kinopoiskapiunofficial.tech</a>. Данные берутся из неофициального API.</p></div></div>'
 }
 function tabsFor(){return kind==="anime"?TABS:{find:"Поиск",mine:"Мой список",profile:"Профиль"}}
 function slim(x){return{kind:x.kind,id:x.id,title:x.title,year:x.year,img:x.img,genre:x.genre,desc:(x.desc||"").slice(0,240),status:x.status,rating:x.rating,links:(x.links||[]).slice(0,3)}}
@@ -258,28 +304,55 @@ async function animeSearch(){
  }
  return await request()
 }
+function skel(){var one='<div class="sk"><i class="c"></i><div><i class="l l1"></i><i class="l l2"></i><i class="l l3"></i></div></div>';return one+one+one}
+function pulse(el){if(!el.classList)return;el.classList.remove("anim");void el.offsetWidth;el.classList.add("anim")}
+function initReveal(){
+ try{
+  var els=document.querySelectorAll("section");
+  if(!("IntersectionObserver" in window)){for(var j=0;j<els.length;j++)els[j].classList.add("in");return}
+  var io=new IntersectionObserver(function(es){es.forEach(function(en){if(en.isIntersecting){en.target.classList.add("in");io.unobserve(en.target)}})},{threshold:.06});
+  for(var i=0;i<els.length;i++){els[i].classList.add("rv");io.observe(els[i])}
+ }catch(e){}
+}
 function cardAny(x){
  if(x.hdr)return'<p class="grp">'+esc(x.hdr)+" <i>"+x.n+"</i></p>";
  if(x.note)return'<div class="msg">'+esc(x.note)+"</div>";
  return x.kind?card2(x):card(x)
 }
+function kpkey(){try{return(localStorage.getItem("anime:kp")||"").trim()}catch(e){return""}}
+function normKp(f){
+ var tv=/SERIES|SHOW/.test(f.type||""),r=parseFloat(f.rating);
+ return{kind:tv?"series":"film",id:"kp"+f.filmId,title:f.nameRu||f.nameEn||"",year:f.year||"",img:https(f.posterUrlPreview||f.posterUrl||""),genre:(f.genres||[]).slice(0,2).map(function(g){return g.genre}).join(", "),desc:f.description||"",status:"",rating:(isNaN(r)||/%/.test(String(f.rating)))?0:r,links:[{site:"Кинопоиск",url:"https://www.kinopoisk.ru/"+(tv?"series":"film")+"/"+f.filmId+"/"}]}
+}
+function searchKp(q){
+ return fetch("https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword="+encodeURIComponent(q)+"&page=1",{headers:{"X-API-KEY":kpkey()}}).then(function(r){if(!r.ok)throw new Error("kp "+r.status);return r.json()}).then(function(d){return(d.films||[]).slice(0,15).map(normKp)})
+}
 async function fetchAll(){
  var my=++token,q=query;page=1;
  render("Ищем…");
  function wrap(p){return p.then(function(v){return{v:v}},function(e){return{e:e}})}
- var res=await Promise.all([wrap(animeSearch()),wrap(searchFilms(q)),wrap(searchSeries(q))]);
+ var src=[{n:"Аниме",p:wrap(animeSearch()),a:true}];
+ if(kpkey())src.push({n:"Кинопоиск",p:wrap(searchKp(q))});
+ src.push({n:"Фильмы",p:wrap(searchFilms(q)),t:true},{n:"Сериалы",p:wrap(searchSeries(q)),t:true});
+ var res=await Promise.all(src.map(function(x){return x.p}));
  if(my!==token)return;
- var names=["Аниме","Фильмы","Сериалы"],out=[],anime=res[0].v?res[0].v.media:[];
- for(var i=0;i<3;i++){
-  var r=res[i],list=r.v?(i===0?r.v.media:r.v):[];
-  if(i>0&&anime.length)list=list.filter(function(x){return!x.anim});
-  out.push({hdr:names[i],n:list.length});
-  if(r.e)out.push({note:r.e.message==="nokey-ru"?"Для поиска по-русски нужен ключ TMDB (вкладка «Профиль»).":"Не удалось загрузить, попробуйте ещё раз."});
+ var out=[],anime=[];
+ src.forEach(function(x,i){x.r=res[i];x.list=x.r.v?(x.a?x.r.v.media:x.r.v):[];if(x.a)anime=x.list});
+ src.forEach(function(x){
+  var list=x.list;
+  if(x.t&&anime.length)list=list.filter(function(y){return!y.anim});
+  out.push({hdr:x.n,n:list.length});
+  if(x.r.e)out.push({note:noteFor(x,x.r.e)});
   else if(!list.length)out.push({note:"Ничего не найдено."});
   else out=out.concat(list)
- }
+ });
  items=out;hasMore=false;render();
  if(anime.length)fillRu(anime)
+}
+function noteFor(x,e){
+ if(e&&e.message==="nokey-ru")return"Для поиска по-русски нужен ключ TMDB (вкладка «Профиль»).";
+ if(x.n==="Кинопоиск")return"Кинопоиск не ответил: проверьте токен в «Профиле» или попробуйте позже.";
+ return"Не удалось загрузить, попробуйте ещё раз."
 }
 function fetchOther(){
  var my=++token,k=kind;
@@ -294,7 +367,7 @@ function fetchOther(){
 }
 function card2(x){
  var id=String(x.id),c=lib[x.kind]||{},saved=id in c;
- var h='<article class="item" data-id="'+id+'">'+(x.img?'<img class="cover" loading="lazy" alt="" src="'+esc(safeUrl(x.img))+'">':'<div class="cover"></div>')+'<div>';
+ var h='<article class="item" data-id="'+id+'">'+(x.img?'<img class="cover" loading="lazy" alt="" onload="this.style.opacity=1" src="'+esc(safeUrl(x.img))+'">':'<div class="cover"></div>')+'<div>';
  var lab=[x.status,x.year,x.genre].filter(Boolean).concat(x.rating?[x.rating+"/10"]:[]).map(esc).join(" / ");
  h+='<p class="lab">'+(lab||esc(KW[x.kind]))+'</p><h3 class="t">'+esc(x.title)+'</h3>';
  if(x.desc)h+='<p class="ep">'+esc(x.desc.length>170?x.desc.slice(0,170)+"…":x.desc)+'</p>';
@@ -349,7 +422,7 @@ function fetchPage(append){
   items=append?items.concat(p.media):p.media;hasMore=!!(p.pageInfo&&p.pageInfo.hasNextPage);render();fillRu(items)
  }).catch(function(){if(my===token)render(query&&isRu(query)?"Русский поиск сейчас недоступен. Попробуйте ввести название по-английски или ромадзи.":"Не удалось загрузить данные. Проверьте интернет и попробуйте ещё раз.")})
 }
-function reset(){page=1;items=[];if(mode==="profile"&&!query){hasMore=false;token++;render();return}if(query){fetchAll();return}if(kind!=="anime"){fetchOther();return}fetchPage(false)}
+function reset(){page=1;items=[];animateNext=true;if(mode==="profile"&&!query){hasMore=false;token++;render();return}if(query){fetchAll();return}if(kind!=="anime"){fetchOther();return}fetchPage(false)}
 document.getElementById("q").oninput=function(e){clearTimeout(timer);var v=e.target.value.trim();timer=setTimeout(function(){query=v;reset()},400)};
 document.getElementById("tabs").onclick=function(e){var b=e.target.closest("button");if(!b)return;mode=b.dataset.tab;query="";document.getElementById("q").value="";reset()};
 document.getElementById("more").onclick=function(){page++;fetchPage(true)};
@@ -412,8 +485,20 @@ async function runBatches(list,label,msg,st){
   await sleep(2500)
  }
 }
-function alt(q){return q.replace(/\s*(Part|Cour)\s*\d+/i,"").replace(/\s*\d+(st|nd|rd|th)\s*Season/i,"").replace(/\s*Season\s*\d+/i,"").replace(/\s*[:\-–].*$/,"").trim()}
+function alt(q){return String(q).normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/\s*\([^)]*\)/g,"").replace(/^Eiga\s+/i,"").replace(/\s*Gekijouban$/i,"").replace(/\s*(Part|Cour)\s*\d+/i,"").replace(/\s*\d+(st|nd|rd|th)\s*Season/i,"").replace(/\s*Season\s*\d+/i,"").replace(/\s*[:\-–].*$/,"").trim()}
+async function viaTmdbList(list,msg,st){
+ var left=[];
+ for(var i=0;i<list.length;i++){
+  var t=list[i];
+  if(!t.ru){left.push(t);continue}
+  msg.textContent="Ищем через TMDB: "+(i+1)+" из "+list.length+"…";
+  try{var r=await animeViaTmdb(t.ru),m=r.media&&r.media[0];if(m)st.found.push({t:t,id:m.id});else left.push(t)}catch(e){left.push(t)}
+  await sleep(300)
+ }
+ return left
+}
 async function viaShiki(list,msg,st){
+ if(shikiBad)return list;
  var left=[];
  for(var i=0;i<list.length;i++){
   var t=list[i];
@@ -425,7 +510,7 @@ async function viaShiki(list,msg,st){
    var res=await post("query($ids:[Int]){Page(perPage:1){media(idMal_in:$ids,type:ANIME){id}}}",{ids:[Number(mal)]},msg);
    var m=res.data&&res.data.Page&&res.data.Page.media[0];
    if(m&&m.id)st.found.push({t:t,id:m.id});else left.push(t)
-  }catch(e){left.push(t)}
+  }catch(e){shikiBad=true;left.push(t);for(var j=i+1;j<list.length;j++)left.push(list[j]);break}
   await sleep(1500)
  }
  return left
@@ -435,12 +520,14 @@ async function importList(list){
  try{done=JSON.parse(localStorage.getItem("anime:imp")||"{}")||{}}catch(e){done={}}
  var todo=list.filter(function(t){if(t.q in done&&String(done[t.q]) in mine){skipped++;if(t.ru)rt[String(done[t.q])]=t.ru;return false}return true});
  var st={found:[],miss:[],failed:[],reason:""};
- await runBatches(todo,"Импорт",msg,st);
+ var cyr=todo.filter(function(t){return isRu(t.q)});todo=todo.filter(function(t){return!isRu(t.q)});
+ await runBatches(todo,"Импорт",msg,st);st.miss=st.miss.concat(cyr);
  var second=[],keep=[];
  st.miss.forEach(function(t){var a=alt(t.q);if(a&&a!==t.q&&a.length>2)second.push({q:a,ru:t.ru,o:t.q});else keep.push(t)});
  st.miss=keep;
  if(second.length)await runBatches(second,"Уточняем поиск",msg,st);
  if(st.miss.length)st.miss=await viaShiki(st.miss,msg,st);
+ if(st.miss.length&&tkey())st.miss=await viaTmdbList(st.miss,msg,st);
  st.found.forEach(function(f){var id=String(f.id);if(!(id in mine))mine[id]={s:"plan"};if(f.t.ru)rt[id]=f.t.ru;done[f.t.o||f.t.q]=f.id});
  save();saveRt();try{localStorage.setItem("anime:imp",JSON.stringify(done))}catch(e){}
  var inList=skipped+st.found.length;
@@ -458,7 +545,7 @@ document.getElementById("file").onchange=function(e){
   importList(list)
  })
 };
-load();reset();
+initReveal();load();reset();
 </script>
 </body>
 </html>
